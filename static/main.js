@@ -791,7 +791,55 @@ AOS.init({
   const container = document.getElementById('globe-3d');
   if (!container) return;
 
-  // Globe.gl may load after this script; retry up to 10 times
+  // Convert hex color to rgba string
+  function hexRgba(hex, a) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  // Color by activity level
+  function siteColor(d, maxJumlah) {
+    const ratio = d.jumlah / maxJumlah;
+    if (ratio > 0.4) return C.coral;   // sangat aktif
+    if (ratio > 0.12) return C.amber;  // aktif
+    return C.teal;                     // jarang
+  }
+
+  // Tooltip HTML
+  function siteTooltip(d, maxJumlah) {
+    const color = siteColor(d, maxJumlah);
+    const pct   = ((d.jumlah / maxJumlah) * 100).toFixed(1);
+    const bar   = Math.round(pct / 5);           // 0–20 blocks
+    const level = d.jumlah / maxJumlah > 0.4 ? 'Sangat Aktif'
+                : d.jumlah / maxJumlah > 0.12 ? 'Aktif'
+                : 'Jarang';
+    return `
+      <div style="
+        background: rgba(10,10,22,0.95);
+        border: 1px solid ${hexRgba(color, 0.5)};
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-family: Outfit, sans-serif;
+        min-width: 180px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+      ">
+        <div style="color:${color};font-weight:700;font-size:13px;margin-bottom:6px">${d.nama}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <div style="flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,0.1);overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${color};border-radius:2px"></div>
+          </div>
+          <span style="color:rgba(240,238,255,0.55);font-size:10px">${pct}%</span>
+        </div>
+        <div style="color:rgba(240,238,255,0.45);font-size:11px">
+          <b style="color:#f0eeff">${d.jumlah.toLocaleString('id-ID')}</b> peluncuran
+          &nbsp;·&nbsp;
+          <span style="color:${color}">${level}</span>
+        </div>
+      </div>`;
+  }
+
   function tryInit(attempts) {
     if (typeof Globe === 'undefined') {
       if (attempts > 0) setTimeout(() => tryInit(attempts - 1), 500);
@@ -803,51 +851,73 @@ AOS.init({
       if (!sites.length) return;
       const maxJumlah = Math.max(...sites.map(s => s.jumlah));
 
+      // Top sites get pulsing rings (top 10 busiest)
+      const topSites = [...sites].sort((a, b) => b.jumlah - a.jumlah).slice(0, 10);
+
+      const w = container.offsetWidth  || 800;
+      const h = container.offsetHeight || 520;
+
       const globe = Globe()
+        .width(w)
+        .height(h)
         .globeImageUrl('https://cdn.jsdelivr.net/npm/three-globe@2.27.2/example/img/earth-night.jpg')
         .bumpImageUrl('https://cdn.jsdelivr.net/npm/three-globe@2.27.2/example/img/earth-topology.png')
         .backgroundColor('#0a0a14')
         .showAtmosphere(true)
-        .atmosphereColor(C.purple)
-        .atmosphereAltitude(0.18)
-        // Launch site points
+        .atmosphereColor('#7c5cfc')
+        .atmosphereAltitude(0.22)
+
+        // ── Flat glowing circles (NO altitude = NO benjolan) ──
         .pointsData(sites)
         .pointLat('lat')
         .pointLng('lon')
-        .pointAltitude(d => (d.jumlah / maxJumlah) * 0.10 + 0.005)
-        .pointRadius(d => (d.jumlah / maxJumlah) * 2.5 + 0.4)
-        .pointColor(() => C.teal)
-        .pointResolution(12)
-        .pointLabel(d => `
-          <div style="
-            background: rgba(10,10,20,0.92);
-            border: 1px solid rgba(0,212,170,0.45);
-            border-radius: 8px;
-            padding: 8px 14px;
-            font-family: Outfit, sans-serif;
-            min-width: 160px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-          ">
-            <div style="color:#00d4aa;font-weight:700;font-size:13px;margin-bottom:4px">${d.nama}</div>
-            <div style="color:rgba(240,238,255,0.55);font-size:11px">
-              <span style="color:#f0eeff;font-weight:600">${d.jumlah.toLocaleString('id-ID')}</span> peluncuran
-            </div>
-          </div>`)
+        .pointAltitude(0)                                            // ← flat!
+        .pointRadius(d => Math.sqrt(d.jumlah / maxJumlah) * 3.5 + 0.5)
+        .pointColor(d => siteColor(d, maxJumlah))
+        .pointResolution(24)
+        .pointLabel(d => siteTooltip(d, maxJumlah))
+
+        // ── Pulsing rings on top 10 sites ──
+        .ringsData(topSites)
+        .ringLat('lat')
+        .ringLng('lon')
+        .ringColor(d => hexRgba(siteColor(d, maxJumlah), 0.6))
+        .ringMaxRadius(d => Math.sqrt(d.jumlah / maxJumlah) * 5 + 1.5)
+        .ringPropagationSpeed(1.5)
+        .ringRepeatPeriod(1400)
+
+        // ── Labels on top 5 sites ──
+        .labelsData(sites.slice(0, 5))
+        .labelLat('lat')
+        .labelLng('lon')
+        .labelText('nama')
+        .labelSize(0.55)
+        .labelDotRadius(0.35)
+        .labelColor(() => 'rgba(240,238,255,0.75)')
+        .labelResolution(2)
+
         (container);
 
-      // Auto-rotate
-      globe.controls().autoRotate      = true;
-      globe.controls().autoRotateSpeed = 0.4;
-      globe.controls().enableZoom      = true;
-      globe.controls().minDistance     = 180;
-      globe.controls().maxDistance     = 600;
+      // Camera: start over Russia/Europe where most sites are
+      globe.pointOfView({ lat: 30, lng: 60, altitude: 2.0 }, 0);
 
-      // Resize
+      // Controls
+      globe.controls().autoRotate      = true;
+      globe.controls().autoRotateSpeed = 0.35;
+      globe.controls().enableZoom      = true;
+      globe.controls().minDistance     = 200;
+      globe.controls().maxDistance     = 750;
+
+      // Proper resize
       function resizeGlobe() {
-        globe.width(container.clientWidth).height(container.clientHeight);
+        const nw = container.offsetWidth;
+        const nh = container.offsetHeight;
+        if (nw > 0 && nh > 0) globe.width(nw).height(nh);
       }
       window.addEventListener('resize', resizeGlobe);
-      setTimeout(resizeGlobe, 150);
+      // Re-check after AOS reveal (page may scroll into view)
+      setTimeout(resizeGlobe, 300);
+      setTimeout(resizeGlobe, 800);
 
       // Pause rotation on hover
       container.addEventListener('mouseenter', () => { globe.controls().autoRotate = false; });
@@ -856,7 +926,7 @@ AOS.init({
     }).catch(console.error);
   }
 
-  tryInit(10);
+  tryInit(12);
 })();
 
 
