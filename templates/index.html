@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbit Analytics — Dasbor Misi Luar Angkasa</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Tabler Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+
+  <!-- AOS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" />
+
+  <!-- Apache ECharts -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
+  <!-- ECharts World Map -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts/map/js/world.js" crossorigin="anonymous"></script>
+
+  <!-- Particles.js -->
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+
+  <!-- CountUp.js -->
+  <script src="https://cdn.jsdelivr.net/npm/countup.js@2.8.0/dist/countUp.umd.js"></script>
+
+  <!-- AOS JS -->
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+
+  <!-- Lottie Player -->
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+
+  <!-- Globe.gl (3D interactive globe) -->
+  <script src="https://unpkg.com/globe.gl/dist/globe.gl.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            outfit: ['Outfit', 'sans-serif'],
+            mono: ['"DM Mono"', 'monospace'],
+          },
+          colors: {
+            base: '#0a0a14',
+            card: '#0f0f1e',
+            purple: '#7c5cfc',
+            teal: '#00d4aa',
+            amber: '#f5a623',
+            coral: '#ff6b6b',
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      background-color: #0a0a14;
+      color: #f0eeff;
+      font-family: 'Outfit', sans-serif;
+      scroll-behavior: smooth;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0a14; }
+    ::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 3px; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      width: 220px;
+      background: #0c0c1a;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      transition: width 0.3s ease;
+      overflow: hidden;
+    }
+    #sidebar.collapsed { width: 64px; }
+    #sidebar .nav-label { transition: opacity 0.2s; white-space: nowrap; }
+    #sidebar.collapsed .nav-label { opacity: 0; pointer-events: none; }
+    #sidebar.collapsed .logo-text { opacity: 0; pointer-events: none; }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      margin: 2px 8px;
+      cursor: pointer;
+      color: rgba(240,238,255,0.55);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .nav-item:hover { background: rgba(124,92,252,0.12); color: #f0eeff; }
+    .nav-item.active { background: rgba(124,92,252,0.2); color: #7c5cfc; }
+    .nav-item i { font-size: 20px; flex-shrink: 0; }
+
+    /* ── Main content ── */
+    #main-content {
+      margin-left: 220px;
+      transition: margin-left 0.3s ease;
+    }
+    #sidebar.collapsed ~ #main-content { margin-left: 64px; }
+
+    /* ── Card base ── */
+    .card {
+      background: #0f0f1e;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    /* ── KPI cards ── */
+    .kpi-card {
+      background: #0f0f1e;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 24px 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+    .kpi-purple::before { background: #7c5cfc; }
+    .kpi-teal::before   { background: #00d4aa; }
+    .kpi-amber::before  { background: #f5a623; }
+    .kpi-coral::before  { background: #ff6b6b; }
+
+    .kpi-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 2.4rem;
+      font-weight: 500;
+      line-height: 1.1;
+    }
+    .kpi-purple .kpi-value { color: #7c5cfc; text-shadow: 0 0 20px rgba(124,92,252,0.45); }
+    .kpi-teal   .kpi-value { color: #00d4aa; text-shadow: 0 0 20px rgba(0,212,170,0.45); }
+    .kpi-amber  .kpi-value { color: #f5a623; text-shadow: 0 0 20px rgba(245,166,35,0.45); }
+    .kpi-coral  .kpi-value { color: #ff6b6b; text-shadow: 0 0 20px rgba(255,107,107,0.45); }
+
+    /* ── Hero ── */
+    #hero-particles { position: absolute; inset: 0; z-index: 0; }
+    .hero-content { position: relative; z-index: 1; }
+
+    /* ── Status badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .badge-success  { background: rgba(0,212,170,0.15); color: #00d4aa; border: 1px solid rgba(0,212,170,0.3); }
+    .badge-failure  { background: rgba(255,107,107,0.15); color: #ff6b6b; border: 1px solid rgba(255,107,107,0.3); }
+    .badge-partial  { background: rgba(245,166,35,0.15); color: #f5a623; border: 1px solid rgba(245,166,35,0.3); }
+    .badge-prelaunch{ background: rgba(180,180,200,0.12); color: #9999bb; border: 1px solid rgba(180,180,200,0.2); }
+
+    /* ── Section title ── */
+    .section-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #f0eeff;
+      margin-bottom: 6px;
+    }
+    .section-subtitle {
+      color: rgba(240,238,255,0.45);
+      font-size: 0.9rem;
+    }
+
+    /* ── Table ── */
+    #missions-table thead th {
+      background: #13132a;
+      color: rgba(240,238,255,0.5);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      white-space: nowrap;
+    }
+    #missions-table tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: background 0.15s;
+    }
+    #missions-table tbody tr:hover { background: rgba(124,92,252,0.06); }
+    #missions-table tbody td {
+      padding: 11px 14px;
+      font-size: 13px;
+      color: rgba(240,238,255,0.8);
+      vertical-align: middle;
+    }
+
+    /* ── Input / Select ── */
+    .dash-input {
+      background: #13132a;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      color: #f0eeff;
+      padding: 9px 14px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .dash-input:focus { border-color: #7c5cfc; }
+    .dash-input option { background: #13132a; }
+
+    /* ── Pagination ── */
+    .page-btn {
+      width: 32px; height: 32px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      background: #13132a;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(240,238,255,0.6);
+      transition: all 0.2s;
+    }
+    .page-btn:hover { background: rgba(124,92,252,0.2); color: #7c5cfc; }
+    .page-btn.active { background: #7c5cfc; color: #fff; border-color: #7c5cfc; }
+
+    /* ── Scroll caret ── */
+    @keyframes bounce-y {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(8px); }
+    }
+    .caret-bounce { animation: bounce-y 1.6s ease-in-out infinite; }
+
+    /* ── Glow divider ── */
+    .glow-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(124,92,252,0.4), transparent);
+      margin: 0;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      #sidebar { width: 64px; }
+      #sidebar .nav-label, #sidebar .logo-text { opacity: 0; pointer-events: none; }
+      #main-content { margin-left: 64px; }
+      .kpi-value { font-size: 1.8rem; }
+    }
+    @media (max-width: 480px) {
+      #sidebar { width: 0; border: none; }
+      #main-content { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════
+     SIDEBAR
+════════════════════════════════════════════════════════════ -->
+<nav id="sidebar">
+  <!-- Logo -->
+  <div class="flex items-center gap-3 px-4 py-5 border-b border-white/5">
+    <div class="w-9 h-9 rounded-lg bg-purple/20 flex items-center justify-center flex-shrink-0">
+      <i class="ti ti-rocket text-purple text-xl"></i>
+    </div>
+    <div class="logo-text transition-opacity duration-200">
+      <div class="text-white font-bold text-sm leading-tight tracking-wide">ORBIT</div>
+      <div class="text-purple/70 text-xs font-mono tracking-widest">ANALYTICS</div>
+    </div>
+  </div>
+
+  <!-- Nav links -->
+  <div class="flex flex-col gap-1 py-4 flex-1 overflow-y-auto overflow-x-hidden">
+    <a href="#beranda"          class="nav-item active">
+      <i class="ti ti-home-2"></i><span class="nav-label">Beranda</span>
+    </a>
+    <a href="#kpi"              class="nav-item">
+      <i class="ti ti-chart-infographic"></i><span class="nav-label">KPI Utama</span>
+    </a>
+    <a href="#ras-luar-angkasa" class="nav-item">
+      <i class="ti ti-timeline"></i><span class="nav-label">Ras Luar Angkasa</span>
+    </a>
+    <a href="#perbandingan"     class="nav-item">
+      <i class="ti ti-chart-bar"></i><span class="nav-label">Perbandingan</span>
+    </a>
+    <a href="#peta"             class="nav-item">
+      <i class="ti ti-map-2"></i><span class="nav-label">Peta Peluncuran</span>
+    </a>
+    <a href="#globe"            class="nav-item">
+      <i class="ti ti-world"></i><span class="nav-label">Globe 3D</span>
+    </a>
+    <a href="#efek-spacex"      class="nav-item">
+      <i class="ti ti-trending-down"></i><span class="nav-label">Efek SpaceX</span>
+    </a>
+    <a href="#kegagalan"        class="nav-item">
+      <i class="ti ti-flame"></i><span class="nav-label">Peta Kegagalan</span>
+    </a>
+    <a href="#data"             class="nav-item">
+      <i class="ti ti-table"></i><span class="nav-label">Data Misi</span>
+    </a>
+  </div>
+
+  <!-- Collapse toggle -->
+  <button id="sidebar-toggle"
+    class="m-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-all self-start"
+    title="Tutup/Buka Sidebar">
+    <i class="ti ti-layout-sidebar-left-collapse text-lg"></i>
+  </button>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════
+     MAIN CONTENT
+════════════════════════════════════════════════════════════ -->
+<main id="main-content">
+
+  <!-- ── HERO ──────────────────────────────────────────────── -->
+  <section id="beranda" class="relative min-h-screen flex items-center overflow-hidden">
+    <div id="hero-particles"></div>
+
+    <div class="hero-content max-w-7xl mx-auto px-8 py-20 w-full">
+      <div class="flex flex-col lg:flex-row items-center gap-10">
+
+        <!-- Text -->
+        <div class="flex-1" data-aos="fade-right" data-aos-duration="900">
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-purple/30 bg-purple/10 text-purple text-xs font-semibold mb-6 tracking-wider">
+            <i class="ti ti-satellite text-sm"></i>
+            DASBOR ANALITIK LUAR ANGKASA
+          </div>
+          <h1 class="text-4xl lg:text-6xl font-extrabold leading-tight text-white mb-4">
+            Lebih dari
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple to-teal">65 Tahun</span>
+            <br/>Eksplorasi Luar Angkasa
+          </h1>
+          <p class="text-white/50 text-lg mb-8 max-w-xl leading-relaxed">
+            Analisis mendalam <span class="text-teal font-semibold">4.630 misi</span> dari
+            <span class="text-amber font-semibold">62 perusahaan</span>,
+            membentang dari tahun <span class="text-white/70">1957</span> hingga
+            <span class="text-white/70">2022</span>.
+          </p>
+          <div class="flex flex-wrap gap-3">
+            <a href="#kpi"
+               class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple text-white font-semibold text-sm hover:bg-purple/80 transition-all shadow-lg shadow-purple/25">
+              <i class="ti ti-chart-dots"></i> Lihat Statistik
+            </a>
+            <a href="#data"
+               class="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/15 text-white/70 font-semibold text-sm hover:border-teal/50 hover:text-teal transition-all">
+              <i class="ti ti-table"></i> Jelajahi Data
+            </a>
+          </div>
+        </div>
+
+        <!-- Lottie -->
+        <div class="flex-shrink-0 w-64 lg:w-80" data-aos="fade-left" data-aos-duration="900" data-aos-delay="200">
+          <lottie-player
+            src="https://assets2.lottiefiles.com/packages/lf20_jR229r.json"
+            background="transparent"
+            speed="0.8"
+            style="width:100%;height:auto;"
+            loop autoplay>
+          </lottie-player>
+        </div>
+
+      </div>
+
+      <!-- Scroll caret -->
+      <div class="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-white/30 caret-bounce">
+        <span class="text-xs font-mono tracking-widest">GULIR KE BAWAH</span>
+        <i class="ti ti-chevrons-down text-xl"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── QUICK FACTS STRIP ─────────────────────────────────── -->
+  <div class="border-y border-white/5 bg-white/[0.02]">
+    <div class="max-w-7xl mx-auto px-8 py-4">
+      <div class="flex flex-wrap gap-x-8 gap-y-3 items-center" id="facts-container">
+        <div class="text-white/20 text-xs animate-pulse">Memuat fakta…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="glow-divider"></div>
+
+  <!-- ── KPI CARDS ─────────────────────────────────────────── -->
+  <section id="kpi" class="max-w-7xl mx-auto px-8 py-16">
+    <div class="mb-10" data-aos="fade-up">
+      <div class="section-title">Indikator Kinerja Utama</div>
+      <div class="section-subtitle">Gambaran besar eksplorasi antariksa global</div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+
+      <div class="kpi-card kpi-purple" data-aos="fade-up" data-aos-delay="0">
+        <div class="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">
+          <i class="ti ti-rocket mr-1"></i>Total Misi
+        </div>
+        <div class="kpi-value" id="kpi-total-misi">0</div>
+        <div class="text-white/30 text-xs mt-2">peluncuran tercatat</div>
+        <div class="absolute bottom-4 right-4 opacity-10">
+          <i class="ti ti-rocket text-5xl text-purple"></i>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-teal" data-aos="fade-up" data-aos-delay="80">
+        <div class="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">
+          <i class="ti ti-target mr-1"></i>Tingkat Sukses
+        </div>
+        <div class="kpi-value" id="kpi-sukses">0</div>
+        <div class="text-white/30 text-xs mt-2">dari seluruh misi</div>
+        <div class="absolute bottom-4 right-4 opacity-10">
+          <i class="ti ti-circle-check text-5xl text-teal"></i>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-amber" data-aos="fade-up" data-aos-delay="160">
+        <div class="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">
+          <i class="ti ti-building-factory mr-1"></i>Total Perusahaan
+        </div>
+        <div class="kpi-value" id="kpi-perusahaan">0</div>
+        <div class="text-white/30 text-xs mt-2">organisasi peluncuran</div>
+        <div class="absolute bottom-4 right-4 opacity-10">
+          <i class="ti ti-building-factory text-5xl text-amber"></i>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-coral" data-aos="fade-up" data-aos-delay="240">
+        <div class="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">
+          <i class="ti ti-calendar-event mr-1"></i>Rentang Tahun
+        </div>
+        <div class="kpi-value" id="kpi-rentang">0</div>
+        <div class="text-white/30 text-xs mt-2">tahun eksplorasi (1957–2022)</div>
+        <div class="absolute bottom-4 right-4 opacity-10">
+          <i class="ti ti-calendar-stats text-5xl text-coral"></i>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Donut + Top 5 row -->
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-5 mt-5">
+
+      <!-- Status donut -->
+      <div class="card p-5 lg:col-span-2" data-aos="fade-up" data-aos-delay="80">
+        <div class="text-xs font-semibold text-white/40 uppercase tracking-widest mb-1">
+          <i class="ti ti-chart-donut mr-1 text-purple"></i>Distribusi Status Misi
+        </div>
+        <div id="chart-donut" style="height:230px;"></div>
+      </div>
+
+      <!-- Top 5 launchers -->
+      <div class="card p-5 lg:col-span-3" data-aos="fade-up" data-aos-delay="160">
+        <div class="text-xs font-semibold text-white/40 uppercase tracking-widest mb-4">
+          <i class="ti ti-trophy mr-1 text-amber"></i>Top 5 Peluncur Paling Aktif
+        </div>
+        <div id="top-launchers-list" class="flex flex-col gap-3"></div>
+      </div>
+
+    </div>
+
+  </section>
+
+  <div class="glow-divider"></div>
+
+  <!-- ── SPACE RACE TIMELINE ────────────────────────────────── -->
+  <section id="ras-luar-angkasa" class="max-w-7xl mx-auto px-8 py-16">
+    <div class="mb-8" data-aos="fade-up">
+      <div class="section-title">Kronologi Ras Luar Angkasa</div>
+      <div class="section-subtitle">Jumlah peluncuran per tahun, 1957–2022</div>
+    </div>
+    <div class="card p-6" data-aos="fade-up" data-aos-delay="100">
+      <div id="chart-timeline" style="height:380px;"></div>
+    </div>
+  </section>
+
+  <div class="glow-divider"></div>
+
+  <!-- ── COMPARISON ─────────────────────────────────────────── -->
+  <section id="perbandingan" class="max-w-7xl mx-auto px-8 py-16">
+    <div class="mb-8" data-aos="fade-up">
+      <div class="section-title">Perbandingan Perusahaan &amp; Harga</div>
+      <div class="section-subtitle">Tingkat keberhasilan dan biaya roket terbaik di dunia</div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card p-6" data-aos="fade-up" data-aos-delay="0">
+        <h3 class="text-sm font-semibold text-white/50 uppercase tracking-widest mb-4">
+          <i class="ti ti-chart-bar mr-1 text-teal"></i>Tingkat Keberhasilan per Perusahaan
+        </h3>
+        <div id="chart-success" style="height:360px;"></div>
+      </div>
+      <div class="card p-6" data-aos="fade-up" data-aos-delay="120">
+        <h3 class="text-sm font-semibold text-white/50 uppercase tracking-widest mb-4">
+          <i class="ti ti-coin mr-1 text-purple"></i>Roket Paling Mahal
+        </h3>
+        <div id="chart-price" style="height:360px;"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="glow-divider"></div>
+
+  <!-- ── MAP ───────────────────────────────────────────────── -->
+  <section id="peta" class="max-w-7xl mx-auto px-8 py-16">
+    <div class="mb-8" data-aos="fade-up">
+      <div class="section-title">Dominasi Negara Peluncuran</div>
+      <div class="section-subtitle">Distribusi peluncuran roket di seluruh dunia</div>
+    </div>
+    <div class="card p-6" data-aos="fade-up" data-aos-delay="100">
+      <div id="chart-map" style="height:440px;"></div>
+    </div>
+  </section>
+
+  <div class="glow-divider"></div>
+
+  <!-- ── GLOBE 3D ──────────────────────────────────────────── -->
+  <section id="globe" class="max-w-7xl mx-auto px-8 py-16">
+    <div class="mb-4" data-aos="fade-up">
+      <div class="section-title">Peta 3D Situs Peluncuran</div>
+      <div class="section-subtitle">Globe interaktif — putar, zoom, dan hover untuk menjelajahi lokasi peluncuran</div>
+    </div>
+    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple/10 border border-purple/25 text-purple text-xs font-semibold mb-6" data-aos="fade-up" data-aos-delay="40">
+      <i class="ti ti-hand-move"></i>
+      Klik &amp; seret untuk memutar · Scroll untuk zoom · Hover titik untuk detail
+    </div>
+    <div class="card overflow-hidden" data-aos="fade-up" data-aos-delay="100">
+      <div id="globe-3d" style="height: 520px; width: 100%; background: #0a0a14;"></div>
+    </div>
+
+    <!-- Legend -->
+    <div class="flex flex-wrap gap-6 mt-4 px-1" data-aos="fade-up" data-aos-delay="140">
+      <div class="flex items-center gap-2 text-xs text-white/40">
+        <span class="inline-block w-3 h-3 rounded-full bg-teal opacity-80"></span>
+        Titik besar = lebih banyak peluncuran
+      </div>
+      <div class="flex items-center gap-2 text-xs text-white/40">
+        <span class="inline-block w-3 h-3 rounded-full bg-purple opacity-80"></span>
+        Atmosfer ungu = efek glow
+      </div>
+    </div>
+  </section>
+
+  <div class="glow-divider"></div>
+
+  <!-- ── SPACEX EFFECT ──────────────────────────────────────── -->
+  <section id="efek-spacex" class="max-w-7xl mx-auto px-8 py-16">
+    <div class="mb-4" data-aos="fade-up">
+      <div class="section-title">Efek SpaceX: Revolusi Harga Roket</div>
+      <div class="section-subtitle">
+        Rerata biaya peluncuran SpaceX vs rata-rata industri per tahun
+      </div>
+    </div>
+    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal/10 border border-teal/25 text-teal text-xs font-semibold mb-6" data-aos="fade-up" data-aos-delay="50">
+      <i class="ti ti-info-circle"></i>
+      SpaceX memangkas biaya peluncuran hingga 90% dibanding era Space Shuttle
+    </div>
+    <div class="card p-6" data-aos="fade-up" data-aos-delay="100">
+      <div id="chart-spacex" style="height:360px;"></div>
+    </div>
+  </section>
+
+  <div class="glow-divider"></div>
+
+  <!-- ── FAILURE HEATMAP ───────────────────────────────────── -->
+  <section id="kegagalan" class="max-w-7xl mx-auto px-8 py-16">
+    <div class="mb-8" data-aos="fade-up">
+      <div class="section-title">Peta Kegagalan Misi per Dekade</div>
+      <div class="section-subtitle">6 perusahaan terbesar — jumlah kegagalan berdasarkan dekade</div>
+    </div>
+    <div class="card p-6" data-aos="fade-up" data-aos-delay="100">
+      <div id="chart-heatmap" style="height:340px;"></div>
+    </div>
+  </section>
+
+  <div class="glow-divider"></div>
+
+  <!-- ── DATA TABLE ─────────────────────────────────────────── -->
+  <section id="data" class="max-w-7xl mx-auto px-8 py-16">
+    <div class="mb-8" data-aos="fade-up">
+      <div class="section-title">Jelajahi Semua Misi</div>
+      <div class="section-subtitle">Filter, cari, dan telusuri seluruh riwayat misi luar angkasa</div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-3 mb-5" data-aos="fade-up" data-aos-delay="50">
+      <div class="relative flex-1 min-w-[220px]">
+        <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-base"></i>
+        <input type="text" id="search-input" placeholder="Cari misi atau perusahaan…"
+               class="dash-input w-full pl-9" />
+      </div>
+      <select id="filter-status" class="dash-input min-w-[160px]">
+        <option value="">Semua Status</option>
+        <option value="Success">Sukses</option>
+        <option value="Failure">Gagal</option>
+        <option value="Partial Failure">Gagal Sebagian</option>
+        <option value="Prelaunch Failure">Gagal Pra-Peluncuran</option>
+      </select>
+      <select id="filter-company" class="dash-input min-w-[180px]">
+        <option value="">Semua Perusahaan</option>
+      </select>
+    </div>
+
+    <!-- Table -->
+    <div class="card overflow-x-auto" data-aos="fade-up" data-aos-delay="100">
+      <table id="missions-table" class="w-full">
+        <thead>
+          <tr>
+            <th class="text-left" style="width:46px">No</th>
+            <th class="text-left">Perusahaan</th>
+            <th class="text-left">Roket</th>
+            <th class="text-left">Misi</th>
+            <th class="text-left">Tanggal</th>
+            <th class="text-left">Status</th>
+            <th class="text-right">Harga (Juta USD)</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="7" class="text-center py-10 text-white/30">Memuat data…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination + info -->
+    <div class="flex flex-wrap items-center justify-between gap-4 mt-4" data-aos="fade-up" data-aos-delay="120">
+      <div class="text-white/35 text-xs font-mono" id="table-info">—</div>
+      <div class="flex items-center gap-1.5" id="pagination"></div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/5 py-8 px-8 text-center text-white/25 text-xs font-mono">
+    ORBIT ANALYTICS &nbsp;·&nbsp; Data: Space Missions 1957–2022 &nbsp;·&nbsp;
+    Dibangun dengan Flask + ECharts + Tailwind CSS
+  </footer>
+
+</main>
+
+<!-- ── Scripts ─────────────────────────────────────────────── -->
+<script src="/static/main.js"></script>
+
+</body>
+</html>
