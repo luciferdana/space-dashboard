@@ -263,7 +263,7 @@ AOS.init({
         textStyle: { color: C.text, fontFamily: 'Outfit, sans-serif' },
         formatter: params => {
           const p = params[0];
-          return `<b>${p.name}</b><br/>Tingkat Sukses: <b style="color:${colors[p.dataIndex]}">${p.value}%</b>`;
+          return `<b>${p.name}</b><br/>Success Rate: <b style="color:${colors[p.dataIndex]}">${p.value}%</b>`;  // Success Rate intentionally English (metric term)
         },
       },
       grid: { left: 120, right: 50, top: 15, bottom: 30 },
@@ -327,7 +327,7 @@ AOS.init({
         textStyle: { color: C.text, fontFamily: 'Outfit, sans-serif' },
         formatter: params => {
           const p = params[0];
-          return `<b>${data.roket[p.dataIndex]}</b><br/>Harga: <b style="color:${C.purple}">USD ${p.value} Juta</b>`;
+          return `<b>${data.roket[p.dataIndex]}</b><br/>Harga: <b style="color:${C.purple}">USD ${p.value}M</b>`;
         },
       },
       grid: { left: 15, right: 15, top: 15, bottom: 80, containLabel: true },
@@ -348,7 +348,7 @@ AOS.init({
         axisTick: { show: false },
         axisLabel: {
           color: C.textMuted, fontSize: 10,
-          formatter: v => v + 'M',
+          formatter: v => '$' + v + 'M',
         },
         splitLine: { lineStyle: { color: C.grid, type: 'dashed' } },
       },
@@ -655,7 +655,7 @@ AOS.init({
         icon: 'ti-coin',
         label: 'Roket Termahal',
         value: data.roket_termahal.length > 22 ? data.roket_termahal.slice(0, 20) + '…' : data.roket_termahal,
-        sub: `USD ${data.harga_termahal} Juta`,
+        sub: `USD ${data.harga_termahal}M`,
         color: C.coral,
       },
     ];
@@ -930,6 +930,171 @@ AOS.init({
 })();
 
 
+// ── Overview Dashboard (compact multi-chart grid) ─────────────
+(function initOverview() {
+
+  // Mini KPI stats
+  apiFetch('/api/stats').then(data => {
+    const set = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+    set('ov-total-misi',  Number(data.total_misi).toLocaleString('id-ID'));
+    set('ov-sukses',      data.tingkat_sukses + '%');
+    set('ov-perusahaan',  data.total_perusahaan);
+    set('ov-rentang',     data.rentang_tahun + ' thn');
+  }).catch(console.error);
+
+  // Mini timeline
+  apiFetch('/api/launches-per-year').then(data => {
+    const chart = initEChart('chart-ov-timeline');
+    if (!chart) return;
+    chart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'axis', backgroundColor: '#1a1a30', borderColor: C.grid,
+        textStyle: { color: C.text, fontFamily: 'Outfit, sans-serif' },
+        formatter: p => `<b>${p[0].axisValue}</b>: <b style="color:${C.teal}">${p[0].value}</b>`,
+      },
+      grid: { left: 32, right: 12, top: 8, bottom: 24, containLabel: false },
+      xAxis: {
+        type: 'category', data: data.tahun,
+        axisLine: { lineStyle: { color: C.grid } }, axisTick: { show: false },
+        axisLabel: { color: C.textMuted, fontSize: 9, interval: 9 }, splitLine: { show: false },
+      },
+      yAxis: {
+        type: 'value', axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.textMuted, fontSize: 9 },
+        splitLine: { lineStyle: { color: C.grid, type: 'dashed' } },
+      },
+      series: [{
+        type: 'line', data: data.jumlah, smooth: true, symbol: 'none',
+        lineStyle: { color: C.teal, width: 2 },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [{ offset: 0, color: 'rgba(0,212,170,0.2)' }, { offset: 1, color: 'rgba(0,212,170,0)' }] } },
+      }],
+      animationDuration: 1200, animationEasing: 'cubicOut',
+    });
+  }).catch(console.error);
+
+  // Mini donut
+  apiFetch('/api/status-breakdown').then(data => {
+    const chart = initEChart('chart-ov-donut');
+    if (!chart) return;
+    const colorMap = {
+      'Sukses': C.teal, 'Gagal': C.coral,
+      'Gagal Sebagian': C.amber, 'Gagal Pra-Peluncuran': 'rgba(180,180,200,0.5)',
+    };
+    chart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'item', backgroundColor: '#1a1a30', borderColor: C.grid,
+        textStyle: { color: C.text, fontFamily: 'Outfit, sans-serif' },
+        formatter: p => `<b>${p.name}</b><br/>${p.value} misi · <b style="color:${p.color}">${p.percent}%</b>`,
+      },
+      legend: {
+        orient: 'vertical', right: 0, top: 'middle',
+        textStyle: { color: C.textMuted, fontSize: 10 },
+        icon: 'circle', itemWidth: 7, itemHeight: 7, itemGap: 8,
+      },
+      series: [{
+        type: 'pie', radius: ['48%', '74%'], center: ['36%', '50%'],
+        data: data.map(d => ({
+          name: d.label, value: d.jumlah,
+          itemStyle: { color: colorMap[d.label] || C.purple, borderRadius: 3, borderColor: C.card, borderWidth: 2 },
+        })),
+        label: { show: false },
+        emphasis: { scale: true, scaleSize: 5, label: { show: true, formatter: '{b}\n{d}%', color: C.text, fontSize: 11 } },
+      }],
+      animationDuration: 1200, animationEasing: 'cubicOut',
+    });
+  }).catch(console.error);
+
+  // Mini success rate (top 6)
+  apiFetch('/api/success-rate-company').then(data => {
+    const chart = initEChart('chart-ov-success');
+    if (!chart) return;
+    const perusahaan = data.perusahaan.slice(0, 6);
+    const rates      = data.tingkat_sukses.slice(0, 6);
+    const colors     = rates.map(v => v >= 90 ? C.teal : v >= 80 ? C.amber : C.coral);
+    chart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'axis', axisPointer: { type: 'none' }, backgroundColor: '#1a1a30', borderColor: C.grid,
+        textStyle: { color: C.text, fontFamily: 'Outfit, sans-serif' },
+        formatter: p => `<b>${p[0].name}</b>: <b style="color:${colors[p[0].dataIndex]}">${p[0].value}%</b>`,
+      },
+      grid: { left: 100, right: 44, top: 6, bottom: 6 },
+      xAxis: {
+        type: 'value', min: 50, max: 100,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.textMuted, fontSize: 9, formatter: v => v + '%' },
+        splitLine: { lineStyle: { color: C.grid, type: 'dashed' } },
+      },
+      yAxis: {
+        type: 'category', data: perusahaan,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.text, fontSize: 11 },
+      },
+      series: [{
+        type: 'bar',
+        data: rates.map((v, i) => ({ value: v, itemStyle: { color: colors[i], borderRadius: [0, 3, 3, 0] } })),
+        barMaxWidth: 16,
+        label: { show: true, position: 'right', color: C.textMuted, fontSize: 9, formatter: '{c}%', fontFamily: 'DM Mono, monospace' },
+      }],
+      animationDuration: 1200, animationEasing: 'cubicOut',
+    });
+  }).catch(console.error);
+
+  // Mini SpaceX effect
+  apiFetch('/api/spacex-effect').then(data => {
+    const chart = initEChart('chart-ov-spacex');
+    if (!chart) return;
+    chart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'axis', backgroundColor: '#1a1a30', borderColor: C.grid,
+        textStyle: { color: C.text, fontFamily: 'Outfit, sans-serif' },
+        formatter: params => {
+          let html = `<b>${params[0].axisValue}</b><br/>`;
+          params.forEach(p => {
+            if (p.value !== null && p.value !== '-')
+              html += `<span style="color:${p.color}">●</span> ${p.seriesName}: <b>${p.value}M</b><br/>`;
+          });
+          return html;
+        },
+      },
+      legend: {
+        bottom: 0, textStyle: { color: C.textMuted, fontSize: 10 },
+        icon: 'roundRect', itemWidth: 10, itemHeight: 3, itemGap: 12,
+      },
+      grid: { left: 40, right: 12, top: 8, bottom: 34 },
+      xAxis: {
+        type: 'category', data: data.tahun,
+        axisLine: { lineStyle: { color: C.grid } }, axisTick: { show: false },
+        axisLabel: { color: C.textMuted, fontSize: 9, interval: 2 }, splitLine: { show: false },
+      },
+      yAxis: {
+        type: 'value', axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.textMuted, fontSize: 9, formatter: v => v + 'M' },
+        splitLine: { lineStyle: { color: C.grid, type: 'dashed' } },
+      },
+      series: [
+        {
+          name: 'Rata-rata Industri', type: 'line', data: data.industri,
+          smooth: true, symbol: 'none', connectNulls: true,
+          lineStyle: { color: C.amber, width: 2 }, itemStyle: { color: C.amber },
+        },
+        {
+          name: 'SpaceX', type: 'line', data: data.spacex,
+          smooth: true, symbol: 'none', connectNulls: true,
+          lineStyle: { color: C.teal, width: 2 }, itemStyle: { color: C.teal },
+        },
+      ],
+      animationDuration: 1200, animationEasing: 'cubicOut',
+    });
+  }).catch(console.error);
+
+})();
+
+
 // ── Data Table ────────────────────────────────────────────────
 (function initTable() {
   let allData   = [];
@@ -939,9 +1104,9 @@ AOS.init({
 
   // Status label map
   const statusLabel = {
-    'Success':          { label: 'Sukses',              cls: 'badge-success' },
-    'Failure':          { label: 'Gagal',               cls: 'badge-failure' },
-    'Partial Failure':  { label: 'Gagal Sebagian',      cls: 'badge-partial' },
+    'Success':          { label: 'Sukses',               cls: 'badge-success' },
+    'Failure':          { label: 'Gagal',                cls: 'badge-failure' },
+    'Partial Failure':  { label: 'Gagal Sebagian',       cls: 'badge-partial' },
     'Prelaunch Failure':{ label: 'Gagal Pra-Peluncuran', cls: 'badge-prelaunch' },
   };
 
